@@ -1,0 +1,11 @@
+version: '3'
+
+services: 
+    ds:
+        image: ds_env_ds
+        volumes: 
+            - ./project:/work
+        ports: 
+            - 8888:8888
+        stdin_open: true
+        tty: true
