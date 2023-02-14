@@ -2,7 +2,7 @@ import torch.nn as nn
 
 
 class TwiceCNN(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, image_size):
         super().__init__()
 
         # 畳み込み層
@@ -16,22 +16,23 @@ class TwiceCNN(nn.Module):
             nn.ReLU(inplace=True),
             # プーリング
             #  - kernel_size: 縦横このピクセル数の範囲の最大値をとる(2なら画像の縦横サイズが半分になる)
-            nn.MaxPool2d(kernel_size=2),  # 128x128 -> 64x64
+            nn.MaxPool2d(kernel_size=2),  # image_size / 2
 
             nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2),  # 64x64 -> 32x32
+            nn.MaxPool2d(kernel_size=2),  # image_size / 4
 
             nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2),  # 32x32 -> 16x16
+            nn.MaxPool2d(kernel_size=2),  # image_size / 8
 
             nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
         )
 
         # 全結合層
-        self.classifier = nn.Linear(in_features=16*16*128, out_features=num_classes)
+        input_size = image_size // 8
+        self.classifier = nn.Linear(in_features=input_size * input_size * 128, out_features=num_classes)
 
     def forward(self, x):
         # 畳み込み層

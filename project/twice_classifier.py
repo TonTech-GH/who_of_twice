@@ -7,11 +7,14 @@ import pytorch_lightning as pl
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import tqdm
 
 from twice_cnn import TwiceCNN
 
 
 class TwiceClassifier:
+    IMG_SIZE = 128
+
     def __init__(self, image_root, batch_size=32):
         self.image_root = image_root
 
@@ -27,13 +30,13 @@ class TwiceClassifier:
 
         # 前処理の定義
         self.valid_transform = transforms.Compose([
-            transforms.Resize((128, 128)),
+            transforms.Resize((self.IMG_SIZE, self.IMG_SIZE)),
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,)),
         ])
 
         self.train_transform = transforms.Compose([
-            transforms.Resize((128, 128)),
+            transforms.Resize((self.IMG_SIZE, self.IMG_SIZE)),
             transforms.RandomHorizontalFlip(),  # ランダムに左右反転
             transforms.ColorJitter(),  # ランダムに画像の色調を変更
             transforms.RandomRotation(10),  # ランダムに画像回転(±10度)
@@ -43,8 +46,8 @@ class TwiceClassifier:
 
     def load_images(self, image_root):
         # 画像の読み込み
-        TRAIN_ROOT = f'{IMAGE_ROOT}/train'
-        VALID_ROOT = f'{IMAGE_ROOT}/valid'
+        TRAIN_ROOT = f'{image_root}/train'
+        VALID_ROOT = f'{image_root}/valid'
 
         train_dataset = datasets.ImageFolder(TRAIN_ROOT, transform=self.train_transform)
         valid_dataset = datasets.ImageFolder(VALID_ROOT, transform=self.valid_transform)
@@ -79,7 +82,7 @@ class TwiceClassifier:
         train_loader, valid_loader = self.create_data_loader(train_dataset, valid_dataset)
 
         # モデル生成・GPUに送る
-        model = TwiceCNN(len(train_dataset.classes))
+        model = TwiceCNN(len(train_dataset.classes), self.IMG_SIZE)
         model.to(self.device)
 
         # 損失関数: 分類なのでクロスエントロピー
@@ -97,7 +100,7 @@ class TwiceClassifier:
         for epoch in range(epochs):
             running_loss = 0.0
             running_acc = 0.0
-            for imgs, labels in train_loader:
+            for imgs, labels in tqdm.tqdm(train_loader, desc=f'epoch{epoch+1} train'):
                 # データをGPUに送る
                 imgs = imgs.to(self.device)
                 labels = labels.to(self.device)
@@ -129,7 +132,7 @@ class TwiceClassifier:
             # Validation
             running_loss = 0.0
             running_acc = 0.0
-            for imgs, labels in valid_loader:
+            for imgs, labels in tqdm.tqdm(valid_loader, desc=f'epoch{epoch+1} val  '):
                 imgs = imgs.to(self.device)
                 labels = labels.to(self.device)
                 output = model(imgs)
@@ -141,28 +144,31 @@ class TwiceClassifier:
             running_acc /= len(valid_loader)
             val_losses.append(running_loss)
             val_accs.append(running_acc)
-            print(f'epoch:{epoch}, loss:{train_losses[epoch]}, acc:{train_accs[epoch]}, val_loss:{running_loss}, val_acc:{running_acc}')
+            print(f'epoch:{epoch+1}, loss:{train_losses[epoch]}, acc:{train_accs[epoch]}, val_loss:{running_loss}, val_acc:{running_acc}')
+
+        # 学習曲線の出力
+        plot_data = {
+            'loss': {'train': train_losses, 'val': val_losses},
+            'accuracy': {'train': train_accs, 'val': val_accs},
+        }
 
         sns.set()
-        plt.plot(train_losses, label='train')
-        plt.plot(val_losses, label='validation')
-        plt.title('loss')
-        plt.xlabel('epoch')
-        plt.ylabel('loss')
-        plt.legend()
-        plt.show()
+        plot_num = len(plot_data)
+        fig, axes = plt.subplots(plot_num, 1, figsize=(7, 5 * plot_num))
 
-        plt.plot(train_accs, label='train')
-        plt.plot(val_accs, label='validation')
-        plt.title('accuracy')
-        plt.xlabel('epoch')
-        plt.ylabel('accuracy')
-        plt.legend()
-        plt.show()
+        for ax, (title, data_dict) in zip(axes, plot_data.items()):
+            ax.plot(data_dict['train'], label='train')
+            ax.plot(data_dict['val'], label='validation')
+            ax.set_title(title)
+            ax.set_xlabel('epoch')
+            ax.set_ylabel(title)
+            ax.legend()
+
+        plt.tight_layout()
+        fig.savefig(f'result_batchsize_{self.batch_size}_imgsize_{self.IMG_SIZE}.png')
 
 
 if __name__ == '__main__':
-    IMAGE_ROOT = './images'
-    classifier = TwiceClassifier(image_root=IMAGE_ROOT)
+    IMAGE_ROOT = './images_faces'
+    classifier = TwiceClassifier(image_root=IMAGE_ROOT, batch_size=32)
     classifier.train()
-    
