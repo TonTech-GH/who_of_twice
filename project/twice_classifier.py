@@ -77,7 +77,7 @@ class TwiceClassifier:
         img_permute = np.clip(img_permute, 0, 1)
         plt.imshow(img_permute)
 
-    def train(self, epochs=15):
+    def train(self, epochs=15, lr=0.0001, weight_decay=5e-4):
         train_dataset, valid_dataset = self.load_images(self.image_root)
         train_loader, valid_loader = self.create_data_loader(train_dataset, valid_dataset)
 
@@ -90,7 +90,8 @@ class TwiceClassifier:
 
         # オプティマイザ
         #  - weight_decay: 重み付けが大きくなりすぎないようにL2正則化を行ってくれる
-        optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+        # optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         train_losses = []
         train_accs = []
@@ -151,6 +152,8 @@ class TwiceClassifier:
             'loss': {'train': train_losses, 'val': val_losses},
             'accuracy': {'train': train_accs, 'val': val_accs},
         }
+        if self.device == 'cuda':
+            plot_data['accuracy'] = {'train': [acc.cpu() for acc in train_accs], 'val': [acc.cpu() for acc in val_accs]}
 
         sns.set()
         plot_num = len(plot_data)
@@ -165,10 +168,23 @@ class TwiceClassifier:
             ax.legend()
 
         plt.tight_layout()
-        fig.savefig(f'result_batchsize_{self.batch_size}_imgsize_{self.IMG_SIZE}.png')
+        fig.savefig(f'result_epochs_{epochs}_batchsize_{self.batch_size}_lr_{lr}_weightdecay_{weight_decay}_imgsize_{self.IMG_SIZE}.png')
+        plt.show()
 
 
 if __name__ == '__main__':
     IMAGE_ROOT = './images_faces'
-    classifier = TwiceClassifier(image_root=IMAGE_ROOT, batch_size=32)
-    classifier.train()
+
+    # 学習率(0.0001がtrain/validのバランスが良さそう)
+    # lr_list = [0.0005, 0.0001, 0.00005]
+    lr_list = [0.0001]
+
+    # weight_decay(変えても結果はあまり変わらない)
+    # wd_list = [0.0005, 0.0001, 0.001]
+    wd_list = [0.0005]
+
+    for lr in lr_list:
+        for wd in wd_list:
+            print('=' * 30 + f' lr:{lr}, wd:{wd} ' + '=' * 30)
+            classifier = TwiceClassifier(image_root=IMAGE_ROOT, batch_size=32)
+            classifier.train(epochs=30, lr=lr, weight_decay=wd)

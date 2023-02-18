@@ -1,8 +1,10 @@
 import glob
 import hashlib
 import os
+import shutil
 
 import pandas as pd
+from sklearn.model_selection import train_test_split
 import tqdm
 
 
@@ -60,3 +62,11 @@ class ImageUtil:
             os.remove(img_path)
 
         return to_del_list
+    
+    def train_test_split(self, test_dir, test_size=0.2, random_state=0):
+        df = self.images_df()
+        path_train, path_test, name_train, name_test = train_test_split(df['path'], df['name'], test_size=test_size, stratify=df['name'], random_state=random_state)
+        for src in path_test:
+            dst = src.replace(self.root_dir, test_dir)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.move(src, dst)
