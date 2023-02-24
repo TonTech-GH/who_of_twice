@@ -62,7 +62,7 @@ class ImageUtil:
             os.remove(img_path)
 
         return to_del_list
-    
+
     def train_test_split(self, test_dir, test_size=0.2, random_state=0):
         df = self.images_df()
         path_train, path_test, name_train, name_test = train_test_split(df['path'], df['name'], test_size=test_size, stratify=df['name'], random_state=random_state)
